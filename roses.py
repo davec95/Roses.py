@@ -37,6 +37,15 @@ particles = []
 a = 0
 b = 0
 
+fullscreen = False
+
+def quit_program(event=None):
+    root.destroy()
+
+def toggle_fullscreen(event=None):
+    global fullscreen
+    fullscreen = not fullscreen
+    root.attributes("-fullscreen", fullscreen)
 
 def restart(event=None):
     global particles, a, b
@@ -89,6 +98,8 @@ def iterate():
 
 
 root.bind("<space>", restart)
+root.bind("q", quit_program)
+root.bind("<Return>", toggle_fullscreen)
 
 restart()
 iterate()
