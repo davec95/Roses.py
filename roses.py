@@ -1,14 +1,15 @@
 from tkinter import *
 import random
 
-WIDTH = 1280
-HEIGHT = 700
+WINDOW_W = 1280
+WINDOW_H = 700
+
+WIDTH = WINDOW_W
+HEIGHT = WINDOW_H
+
+fullscreen = False
 
 SCALE = 9.5
-
-# Doubled from original (320,223)
-CX = 640
-CY = 446
 
 COLORS = [
     "#555555",  # EGA 8
@@ -24,6 +25,9 @@ COLORS = [
 root = Tk()
 root.title("8-Particle Rose Attractor")
 
+SCREEN_W = root.winfo_screenwidth()
+SCREEN_H = root.winfo_screenheight()
+
 canvas = Canvas(
     root,
     width=WIDTH,
@@ -33,20 +37,38 @@ canvas = Canvas(
 )
 canvas.pack()
 
+cx = canvas.winfo_width() // 2
+cy = canvas.winfo_height() // 2
+
 particles = []
 a = 0
 b = 0
 
-fullscreen = False
-
 def quit_program(event=None):
     root.destroy()
 
+def resize_canvas(w, h):
+    canvas.config(width=w, height=h)
+
 def toggle_fullscreen(event=None):
     global fullscreen
-    fullscreen = not fullscreen
-    root.attributes("-fullscreen", fullscreen)
 
+    fullscreen = not fullscreen
+
+    if fullscreen:
+        root.attributes("-fullscreen", True)
+        resize_canvas(SCREEN_W, SCREEN_H)
+    else:
+        root.attributes("-fullscreen", False)
+        resize_canvas(WINDOW_W, WINDOW_H)
+
+def escape_fullscreen(event=None):
+    global fullscreen
+
+    fullscreen = False
+    root.attributes("-fullscreen", False)
+    resize_canvas(WINDOW_W, WINDOW_H)
+    
 def restart(event=None):
     global particles, a, b
 
@@ -69,7 +91,6 @@ def restart(event=None):
 
         particles.append([x, y, c, COLORS[i]])
 
-
 def iterate():
     for _ in range(500):
 
@@ -84,8 +105,8 @@ def iterate():
             p[1] = yp
             p[2] = cp
 
-            px = int(SCALE * xp + CX)
-            py = int(SCALE * yp + CY)
+            px = int(SCALE * xp + cx)
+            py = int(SCALE * yp + cy)
 
             if 0 <= px < WIDTH and 0 <= py < HEIGHT:
                 canvas.create_line(
