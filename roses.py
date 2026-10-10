@@ -1,5 +1,6 @@
 from tkinter import *
 import random
+import numpy as np
 
 WINDOW_W = 1280
 WINDOW_H = 700
@@ -16,6 +17,17 @@ COLORS = [
     "#ffffff"   # EGA 15
 ]
 
+# Same colors as RGB triples for the numpy framebuffer
+COLOR_RGB = np.array(
+    [
+        [int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16)]
+        for c in COLORS
+    ],
+    dtype=np.uint8
+)
+
+STEPS_PER_TICK = 20000
+
 root = Tk()
 root.geometry(f"{WINDOW_W}x{WINDOW_H}")
 
@@ -30,38 +42,50 @@ canvas = Canvas(
 canvas.pack(fill="both", expand=True)
 
 photo = None
+img_id = None
+fb = None          # numpy RGB framebuffer, shape (h, w, 3)
+fb_w = 0
+fb_h = 0
 particles = []
 a = 0.0
 b = 0.0
 fullscreen = False
 
 
+def blit():
+    global photo, img_id
+
+    ppm = (
+        b"P6\n%d %d\n255\n" % (fb_w, fb_h)
+        + fb.tobytes()
+    )
+
+    photo = PhotoImage(data=ppm)
+
+    if img_id is None:
+        img_id = canvas.create_image(
+            0,
+            0,
+            image=photo,
+            anchor=NW
+        )
+    else:
+        canvas.itemconfig(img_id, image=photo)
+
+
 def create_framebuffer(w, h):
-    global photo
+    global fb, fb_w, fb_h, img_id
 
     canvas.delete("all")
+    img_id = None
 
-    photo = PhotoImage(width=w, height=h)
+    fb_w = w
+    fb_h = h
+    fb = np.zeros((h, w, 3), dtype=np.uint8)
 
     canvas.config(width=w, height=h)
 
-    canvas.create_image(
-        0,
-        0,
-        image=photo,
-        anchor=NW
-    )
-
-    photo.put("black", to=(0, 0, w, h))
-
-
-def plot(px, py, color):
-
-    w = photo.width()
-    h = photo.height()
-
-    if 0 <= px < w and 0 <= py < h:
-        photo.put(color, (px, py))
+    blit()
 
 
 def restart(event=None):
@@ -94,7 +118,7 @@ def restart(event=None):
         )
 
         particles.append(
-            [x, y, c, COLORS[i]]
+            [x, y, c]
         )
 
 
@@ -158,19 +182,18 @@ def quit_program(event=None):
 
 def iterate():
 
-    w = photo.width()
-    h = photo.height()
+    cx = fb_w // 2
+    cy = fb_h // 2
 
-    cx = w // 2
-    cy = h // 2
+    px_list = []
+    py_list = []
+    ci_list = []
 
-    batch = []
+    for _ in range(STEPS_PER_TICK):
 
-    for _ in range(5000):
+        for j, p in enumerate(particles):
 
-        for p in particles:
-
-            x, y, c, color = p
+            x, y, c = p
 
             xp = a * x + y + c
 
@@ -185,16 +208,31 @@ def iterate():
             p[1] = yp
             p[2] = cp
 
-            px = int(SCALE * xp + cx)
-            py = int(SCALE * yp + cy)
+            px_list.append(int(SCALE * xp + cx))
+            py_list.append(int(SCALE * yp + cy))
+            ci_list.append(j)
 
-            if 0 <= px < w and 0 <= py < h:
-                batch.append(
-                    (px, py, color)
-                )
+    px = np.array(px_list, dtype=np.int64)
+    py = np.array(py_list, dtype=np.int64)
+    ci = np.array(ci_list, dtype=np.int64)
 
-    for px, py, color in batch:
-        photo.put(color, (px, py))
+    inside = (
+        (px >= 0) & (px < fb_w) &
+        (py >= 0) & (py < fb_h)
+    )
+
+    # paint each particle's points in one fancy-index op
+    for j in range(len(particles)):
+        m = inside & (ci == j)
+        if m.any():
+            fb[py[m], px[m]] = COLOR_RGB[j]
+
+    blit()
+
+    # Force the canvas redraw now. With after(1) keeping the
+    # event loop busy, Tk would otherwise never go idle and
+    # the new PhotoImage would never reach the screen.
+    root.update_idletasks()
 
     root.after(1, iterate)
 
