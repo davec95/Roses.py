@@ -4,11 +4,6 @@ import random
 WINDOW_W = 1280
 WINDOW_H = 700
 
-WIDTH = WINDOW_W
-HEIGHT = WINDOW_H
-
-fullscreen = False
-
 SCALE = 9.5
 
 COLORS = [
@@ -19,56 +14,31 @@ COLORS = [
     "#ff5555",  # EGA 12
     "#ff55ff",  # EGA 13
     "#ffff55",  # EGA 14
-    "#ffffff",  # EGA 15
+    "#ffffff"   # EGA 15
 ]
 
 root = Tk()
-root.title("8-Particle Rose Attractor")
+root.geometry(f"{WINDOW_W}x{WINDOW_H}")
+root.configure(bg="black")
 
 SCREEN_W = root.winfo_screenwidth()
 SCREEN_H = root.winfo_screenheight()
 
 canvas = Canvas(
     root,
-    width=WIDTH,
-    height=HEIGHT,
+    width=WINDOW_W,
+    height=WINDOW_H,
     bg="black",
     highlightthickness=0
 )
-canvas.pack()
-
-cx = canvas.winfo_width() // 2
-cy = canvas.winfo_height() // 2
+canvas.pack(fill="both", expand=True)
 
 particles = []
-a = 0
-b = 0
+a = 0.0
+b = 0.0
+fullscreen = False
 
-def quit_program(event=None):
-    root.destroy()
 
-def resize_canvas(w, h):
-    canvas.config(width=w, height=h)
-
-def toggle_fullscreen(event=None):
-    global fullscreen
-
-    fullscreen = not fullscreen
-
-    if fullscreen:
-        root.attributes("-fullscreen", True)
-        resize_canvas(SCREEN_W, SCREEN_H)
-    else:
-        root.attributes("-fullscreen", False)
-        resize_canvas(WINDOW_W, WINDOW_H)
-
-def escape_fullscreen(event=None):
-    global fullscreen
-
-    fullscreen = False
-    root.attributes("-fullscreen", False)
-    resize_canvas(WINDOW_W, WINDOW_H)
-    
 def restart(event=None):
     global particles, a, b
 
@@ -77,7 +47,9 @@ def restart(event=None):
     a = random.uniform(-1.0, 1.0)
     b = 1.0 - a
 
-    print(f"a = {a:.6f}    b = {b:.6f}")
+    root.title(
+        f"8-Particle Rose Attractor    a={a:.6f}    b={b:.6f}"
+    )
 
     particles = []
 
@@ -91,14 +63,74 @@ def restart(event=None):
 
         particles.append([x, y, c, COLORS[i]])
 
+
+def quit_program(event=None):
+    root.destroy()
+
+
+def toggle_fullscreen(event=None):
+    global fullscreen
+
+    fullscreen = not fullscreen
+
+    if fullscreen:
+
+        root.attributes("-fullscreen", True)
+
+        canvas.config(
+            width=SCREEN_W,
+            height=SCREEN_H
+        )
+
+    else:
+
+        root.attributes("-fullscreen", False)
+
+        root.geometry(f"{WINDOW_W}x{WINDOW_H}")
+
+        canvas.config(
+            width=WINDOW_W,
+            height=WINDOW_H
+        )
+
+    root.update()
+
+
+def escape_fullscreen(event=None):
+    global fullscreen
+
+    fullscreen = False
+
+    root.attributes("-fullscreen", False)
+
+    root.geometry(f"{WINDOW_W}x{WINDOW_H}")
+
+    canvas.config(
+        width=WINDOW_W,
+        height=WINDOW_H
+    )
+
+    root.update()
+
+
 def iterate():
+
     for _ in range(500):
 
+        cx = canvas.winfo_width() // 2
+        cy = canvas.winfo_height() // 2
+
         for p in particles:
+
             x, y, c, color = p
 
             xp = a * x + y + c
-            cp = 2 * b * xp * xp / (1 + xp * xp)
+
+            cp = (
+                2.0 * b * xp * xp
+                / (1.0 + xp * xp)
+            )
+
             yp = a * xp - x + cp
 
             p[0] = xp
@@ -108,7 +140,11 @@ def iterate():
             px = int(SCALE * xp + cx)
             py = int(SCALE * yp + cy)
 
-            if 0 <= px < WIDTH and 0 <= py < HEIGHT:
+            if (
+                0 <= px < canvas.winfo_width()
+                and
+                0 <= py < canvas.winfo_height()
+            ):
                 canvas.create_line(
                     px, py,
                     px + 1, py,
@@ -119,8 +155,9 @@ def iterate():
 
 
 root.bind("<space>", restart)
-root.bind("q", quit_program)
 root.bind("<Return>", toggle_fullscreen)
+root.bind("<Escape>", escape_fullscreen)
+root.bind("q", quit_program)
 
 restart()
 iterate()
