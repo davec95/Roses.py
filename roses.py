@@ -1,3 +1,29 @@
+#!/usr/bin/env python3
+"""
+roses.py - Animated 8-particle rose attractor.
+
+Steps 8 particles through the rose (Clifford-style) attractor
+    x' = a*x + y + c
+    c' = 2*b*x'^2 / (1 + x'^2)
+    y' = a*x' - x + c'
+and paints every point onto a numpy RGB framebuffer, blitted to
+the screen as one bulk PhotoImage per tick (~2M points/sec).
+Each particle draws in its own EGA palette color.
+
+Controls:
+    Space      next rose: replays the next buffered (a, b) pair,
+               or picks a new random pair when the buffer is used up
+    Backspace  previous rose: reuses the buffered (a, b) pair
+    Enter      toggle fullscreen
+    Escape     leave fullscreen
+    q          quit
+
+The last BUFFER_SIZE (a, b) pairs are remembered, so Backspace
+revisits each rose exactly as it was first drawn.
+
+Usage: ./roses.py   (or: python3 roses.py)
+"""
+
 from tkinter import *
 import random
 import numpy as np
@@ -5,6 +31,8 @@ import numpy as np
 WINDOW_W = 1280
 WINDOW_H = 700
 SCALE = 9.5
+
+BUFFER_SIZE = 20
 
 COLORS = [
     "#555555",  # EGA 8
@@ -51,6 +79,9 @@ a = 0.0
 b = 0.0
 fullscreen = False
 
+ab_buffer = []     # remembered (a, b) pairs, max BUFFER_SIZE entries
+index = 0          # current position in ab_buffer
+
 
 def blit():
     global photo, img_id
@@ -88,14 +119,12 @@ def create_framebuffer(w, h):
     blit()
 
 
-def restart(event=None):
-    global particles, a, b
-
-    a = random.uniform(-1.0, 1.0)
-    b = 1.0 - a
+def render():
+    global particles
 
     root.title(
-        f"Rose Attractor   a={a:.6f}   b={b:.6f}"
+        f"Rose Attractor   #{index}   "
+        f"a={a:.6f}   b={b:.6f}"
     )
 
     create_framebuffer(
@@ -120,6 +149,52 @@ def restart(event=None):
         particles.append(
             [x, y, c]
         )
+
+
+def next_rose(event=None):
+    global index, a, b
+
+    index += 1
+
+    if index < len(ab_buffer):
+
+        # a rose we have already seen: replay it exactly
+        a, b = ab_buffer[index]
+
+    else:
+
+        a = random.uniform(-1.0, 1.0)
+        b = 1.0 - a
+
+        if index < BUFFER_SIZE:
+
+            # room left in the buffer: remember this one
+            ab_buffer.append(
+                (a, b)
+            )
+
+        else:
+
+            # buffer full: this rose is ephemeral,
+            # park the index at the buffer edge
+            index = BUFFER_SIZE
+
+    render()
+
+
+def back_rose(event=None):
+    global index, a, b
+
+    if index > 0:
+        index -= 1
+
+    # index is always < len(ab_buffer) here:
+    # it can never go below 0, and the ephemeral
+    # zone parks it at BUFFER_SIZE, one past the
+    # last saved entry
+    a, b = ab_buffer[index]
+
+    render()
 
 
 def toggle_fullscreen(event=None):
@@ -149,7 +224,7 @@ def toggle_fullscreen(event=None):
             WINDOW_H
         )
 
-    restart(None)
+    render()
 
 
 def escape_fullscreen(event=None):
@@ -173,7 +248,7 @@ def escape_fullscreen(event=None):
             WINDOW_H
         )
 
-        restart(None)
+        render()
 
 
 def quit_program(event=None):
@@ -237,7 +312,8 @@ def iterate():
     root.after(1, iterate)
 
 
-root.bind("<space>", restart)
+root.bind("<space>", next_rose)
+root.bind("<BackSpace>", back_rose)
 root.bind("<Return>", toggle_fullscreen)
 root.bind("<Escape>", escape_fullscreen)
 root.bind("q", quit_program)
@@ -249,7 +325,15 @@ create_framebuffer(
     WINDOW_H
 )
 
-restart()
+# first rose: index 0, saved into the buffer
+a = random.uniform(-1.0, 1.0)
+b = 1.0 - a
+
+ab_buffer.append(
+    (a, b)
+)
+
+render()
 iterate()
 
 root.mainloop()
